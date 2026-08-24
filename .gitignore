@@ -1,0 +1,6 @@
+# Multica / Agent runtime files
+.agents/
+.agent_context/
+.multica/
+AGENTS.md
+reply.md
