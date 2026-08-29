@@ -72,12 +72,20 @@
 4. В поле **Source** скопируйте и вставьте всё содержимое файла `usb-watchdog-check.rsc`.
 5. Нажмите **Apply** → **OK**.
 
-#### Вариант Б. Через терминал MikroTik
+#### Вариант Б. Через терминал MikroTik (импорт или создание)
+
+**Способ 1 (быстрый импорт файла):**
+Загрузите файл `usb-watchdog-check.rsc` на роутер и выполните:
 ```routeros
-/system script add name=usb-watchdog-check policy=ftp,reboot,read,write,policy,test,sniff,sensitive,api
+/system script add name=usb-watchdog-check policy=read,write,test,reboot,policy,sensitive source=[/file get usb-watchdog-check.rsc contents]
+```
+
+**Способ 2 (через редактор CLI):**
+```routeros
+/system script add name=usb-watchdog-check policy=read,write,test,reboot,policy,sensitive
 /system script edit usb-watchdog-check source
 ```
-Вставьте код скрипта, сохраните комбинацией `Ctrl+O` и выйдите `Ctrl+X`.
+Вставьте код скрипта и нажмите `Ctrl+O` для сохранения и выхода.
 
 ---
 
@@ -99,7 +107,7 @@
 Для автоматического запуска каждые 30 секунд с момента старта роутера выполните в терминале:
 
 ```routeros
-/system scheduler add name=usb-watchdog-scheduler interval=30s start-time=startup on-event="/system script run usb-watchdog-check" policy=read,write,test,reboot,policy,sniff,sensitive,ftp
+/system scheduler add name=usb-watchdog-scheduler interval=30s start-time=startup on-event="/system script run usb-watchdog-check" policy=read,write,test,reboot,policy,sensitive
 ```
 
 ---
