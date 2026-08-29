@@ -29,7 +29,7 @@
 :global wdRebootCycles
 
 # ---------------- настройки (можно менять) ----------------
-:local pingAddress "8.8.8.8"
+:local pingAddress "77.88.8.8"
 :local failThreshold 4
 :local usbResetDuration "10s"
 :local maxQuickAttempts 2
