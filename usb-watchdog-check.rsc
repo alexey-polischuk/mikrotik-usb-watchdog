@@ -2,7 +2,6 @@
 # USB LTE/3G modem watchdog (v2.1 Hardened & Decoupled)
 # Hardware: MikroTik RB2011 / RouterOS v7.24+
 # Architecture: RAM-first, 0 Flash Wear, Dual Ping, Decoupled Secrets
-# Repository: http://10.10.30.105:3000/home-lab/mikrotik-usb-watchdog
 # ============================================================
 
 :global wdFailCount
