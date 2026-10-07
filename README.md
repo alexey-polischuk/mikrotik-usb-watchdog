@@ -1,6 +1,7 @@
-# USB Watchdog для LTE/3G модема — MikroTik (RouterOS 7.24+)
+# USB Watchdog для LTE/3G модема — MikroTik (RouterOS v7.24.5 stable)
 
-Скрипт автоматического мониторинга и восстановления интернет-соединения через USB-модем для роутеров MikroTik (**RouterOS 7.24+**, протестировано на **RB2011**).
+Скрипт автоматического мониторинга и восстановления интернет-соединения через USB-модем для роутеров MikroTik.  
+**Протестировано и находится в эксплуатации на:** RouterOS **v7.24.5 (stable)**, платформа **MikroTik RB2011UiAS-2HnD** (MIPSBE).
 
 **Актуальная версия: v2.1.0** (RAM-First, 0 Flash Wear, Dual-Ping РФ, Decoupled Secrets).
 
