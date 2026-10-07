@@ -15,8 +15,9 @@
 :global synoChatWebhook
 
 # ---------------- Настройки ----------------
+# Надежные контрольные узлы для РФ (Яндекс DNS + НСДИ):
 :local pingHost1 "77.88.8.8"
-:local pingHost2 "1.1.1.1"
+:local pingHost2 "195.208.4.1"
 :local failThreshold 4
 :local usbResetDuration "10s"
 :local maxQuickAttempts 2
