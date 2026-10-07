@@ -1,7 +1,6 @@
-# USB Watchdog для LTE/3G модема — MikroTik (RouterOS v7.24.5 stable)
+# USB Watchdog для LTE/3G модема — MikroTik (RouterOS 7.24+)
 
-Скрипт автоматического мониторинга и восстановления интернет-соединения через USB-модем для роутеров MikroTik.  
-**Протестировано и находится в эксплуатации на:** RouterOS **v7.24.5 (stable)**, платформа **MikroTik RB2011UiAS-2HnD** (MIPSBE).
+Скрипт автоматического мониторинга и восстановления интернет-соединения через USB-модем для роутеров MikroTik (**RouterOS 7.24+**, протестировано на **RB2011**).
 
 **Актуальная версия: v2.1.0** (RAM-First, 0 Flash Wear, Dual-Ping РФ, Decoupled Secrets).
 
@@ -10,16 +9,11 @@
 
 ---
 
-## 🖥️ Аппаратное и программное тестовое окружение
+## Совместимость и тестирование
 
-Скрипт протестирован и находится в постоянной боевой эксплуатации в следующем сетевом контуре:
-
-* **Модель роутера:** MikroTik `RB2011UiAS-2HnD`
-* **Архитектура платформы:** `MIPSBE` (SoC Atheros AR9344 600 MHz, 128 MB RAM, 128 MB NAND Flash)
-* **Версия операционной системы:** RouterOS `v7.24.5 (stable)`
-* **Версия RouterBOOT (Firmware):** `7.24.5` (firmware-type: `ar9344`)
-* **Тип USB-модема:** USB LTE/4G модем в режиме NCM/RNDIS/CDC-Ethernet (интерфейс `lte1`, внутренний шлюз модема `192.168.1.1`, сеть Yota / Мегафон)
-* **Управление питанием:** Аппаратный USB Power-Reset (`/system routerboard usb power-reset`)
+* **Операционная система:** MikroTik RouterOS **7.24+** (протестировано на `v7.24.5`)
+* **Оборудование:** MikroTik **RB2011** (с поддержкой `/system routerboard usb power-reset`)
+* **Модем:** USB LTE/4G/3G модем
 
 ---
 
@@ -48,18 +42,18 @@ mikrotik-usb-watchdog/
    - Мониторинг по двум независимым узлам:
      - `pingHost1` = `77.88.8.8` (Яндекс DNS)
      - `pingHost2` = `195.208.4.1` (НСДИ РФ / НИИ «Восход», RTT ~25–40 ms)
-   - Полная независимость от блокировок зарубежных DNS (`8.8.8.8`, `1.1.1.1`) на российских сотовых операторах.
+   - Полная независимость от блокировок зарубежных DNS (`8.8.8.8`, `1.1.1.1`) на российских операторах.
 3. **Быстрые попытки сброса (USB Power-Reset):**
    - До `maxQuickAttempts` (по умолчанию 2) попыток с паузой `quickRetryTicks` (2 мин).
 4. **Прогрессивный бэкофф (Exponential Backoff):**
    - 1-й цикл: пауза **2 часа** (240 тиков).
    - 2-й цикл: пауза **6 часов** (720 тиков).
 5. **Изоляция секретов (Decoupled Secrets):**
-   - Секретный URL вебхука хранится в отдельном изолированном скрипте `usb-watchdog-secrets` с минимальными правами `read,test`. Основной код `usb-watchdog-check.rsc` на 100% обезличен и безопасен для публикации в Git.
+   - Секретный URL вебхука хранится в отдельном скрипте `usb-watchdog-secrets`. Основной код `usb-watchdog-check.rsc` на 100% обезличен и безопасен для публикации в Git.
 6. **Уведомления в Synology Chat:**
    - Оповещение отправляется только при фактическом восстановлении связи после аварии.
 7. **Крайняя мера (Reboot Fallback):**
-   - Полная системная перезагрузка роутера (`/system reboot`) при исчерпании лимита бэкофф-циклов.
+   - Полная системная перезагрузка роутера (`/system reboot`) при исчерпании лимита бэкофф-циклов (с сохранением реального счетчика циклов перед ребутом).
 
 ---
 
@@ -92,6 +86,7 @@ mikrotik-usb-watchdog/
 ```routeros
 /system script add name=usb-watchdog-secrets policy=read,test source=":global synoChatWebhook \"https://YOUR-NAS:5001/webapi/entry.cgi?api=SYNO.Chat.External&method=incoming&version=2&token=YOUR_TOKEN\""
 ```
+*(Или в WinBox: **System → Scripts → [+]**, Name: `usb-watchdog-secrets`, Policies: отметьте `read` и `test`, в поле Source вставьте строку инициализации со своим вебхуком).*
 
 ---
 
@@ -136,3 +131,8 @@ mikrotik-usb-watchdog/
    ```routeros
    /system routerboard usb power-reset duration=5s
    ```
+4. **Контроль износа Flash:**
+   ```routeros
+   /system resource print
+   ```
+   Параметр `write-sect-since-reboot` не должен прирастать на штатных циклах.
