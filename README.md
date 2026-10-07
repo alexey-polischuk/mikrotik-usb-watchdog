@@ -83,9 +83,9 @@ mikrotik-usb-watchdog/
 
 ### Шаг 2. Создание или обновление основного скрипта `usb-watchdog-check`
 
-**Вариант А (прямая загрузка из локального Gitea «Чай»):**
+**Вариант А (прямая загрузка с репозитория):**
 ```routeros
-/tool fetch url="http://10.10.30.105:3000/home-lab/mikrotik-usb-watchdog/raw/branch/main/usb-watchdog-check.rsc" dst-path="usb-watchdog-check.rsc"
+/tool fetch url="https://raw.githubusercontent.com/alexey-polischuk/mikrotik-usb-watchdog/main/usb-watchdog-check.rsc" dst-path="usb-watchdog-check.rsc"
 /system script set usb-watchdog-check policy=read,write,test,reboot source=[/file get "usb-watchdog-check.rsc" contents]
 /file remove "usb-watchdog-check.rsc"
 ```
