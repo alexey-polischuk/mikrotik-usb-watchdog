@@ -2,7 +2,25 @@
 
 Скрипт автоматического мониторинга и восстановления интернет-соединения через USB-модем для роутеров MikroTik (**RouterOS 7.24+**, протестировано на **RB2011**).
 
-**Версия: v2.1 Hardened & Decoupled** (RAM-First, 0 Flash Wear, Dual-Ping, Decoupled Secrets).
+**Актуальная версия: v2.1.0** (RAM-First, 0 Flash Wear, Dual-Ping РФ, Decoupled Secrets).
+
+> 📁 **Архив версий:** Исходная версия v1.0 сохранена в каталоге [`archive/v1.0/`](archive/v1.0/).  
+> 📝 **История изменений:** Подробный журнал версий доступен в [`CHANGELOG.md`](CHANGELOG.md).
+
+---
+
+## Структура репозитория
+
+```text
+mikrotik-usb-watchdog/
+├── usb-watchdog-check.rsc            # Основной скрипт мониторинга (v2.1)
+├── usb-watchdog-secrets.rsc.template # Шаблон скрипта секретов (Synology Chat Webhook)
+├── CHANGELOG.md                      # Журнал изменений версий
+├── README.md                         # Документация и руководство по установке
+└── archive/
+    └── v1.0/
+        └── usb-watchdog-check-v1.0.rsc # Архивная рабочая версия v1.0
+```
 
 ---
 
@@ -11,21 +29,23 @@
 1. **Защита Flash-памяти (RAM-First, 0 Flash Wear):**
    - Все рабочие счетчики тиков, бэкоффа и проверок живут **исключительно в оперативной памяти (ОЗУ)**.
    - Чтение файла состояния с диска происходит **только 1 раз при старте роутера**.
-   - Дифференциальная запись на диск (`/file set`) выполняется **только при реальной смене макро-состояния** (переход в бэкофф / восстановление). В штатном режиме нагрузка на Flash-память ровна **0**.
-2. **Отказоустойчивый Dual-Ping:**
-   - Мониторинг по двум независимым узлам (`77.88.8.8` Яндекс DNS и `1.1.1.1` Cloudflare DNS).
-   - Исключает ложные перезагрузки модема при деградации одного из провайдеров DNS.
+   - Дифференциальная запись на диск (`/file set`) выполняется **только при реальной смене макро-состояния** (переход в бэкофф / восстановление). В штатном режиме нагрузка на Flash-память равна **0 записей в сутки**.
+2. **Отказоустойчивый Dual-Ping для РФ:**
+   - Мониторинг по двум независимым узлам:
+     - `pingHost1` = `77.88.8.8` (Яндекс DNS)
+     - `pingHost2` = `195.208.4.1` (НСДИ РФ / НИИ «Восход», RTT ~25–40 ms)
+   - Полная независимость от блокировок зарубежных DNS (`8.8.8.8`, `1.1.1.1`) на российских операторах.
 3. **Быстрые попытки сброса (USB Power-Reset):**
    - До `maxQuickAttempts` (по умолчанию 2) попыток с паузой `quickRetryTicks` (2 мин).
 4. **Прогрессивный бэкофф (Exponential Backoff):**
    - 1-й цикл: пауза **2 часа** (240 тиков).
    - 2-й цикл: пауза **6 часов** (720 тиков).
 5. **Изоляция секретов (Decoupled Secrets):**
-   - Секретный URL вебхука хранится в отдельном изолированном скрипте `usb-watchdog-secrets`. Основной код `usb-watchdog-check.rsc` на 100% обезличен и безопасен для публикации в Git.
+   - Секретный URL вебхука хранится в отдельном скрипте `usb-watchdog-secrets`. Основной код `usb-watchdog-check.rsc` на 100% обезличен и безопасен для публикации в Git.
 6. **Уведомления в Synology Chat:**
    - Оповещение отправляется только при фактическом восстановлении связи после аварии.
 7. **Крайняя мера (Reboot Fallback):**
-   - Полная перезагрузка роутера (`/system reboot`) при исчерпании всех циклов бэкоффа.
+   - Полная системная перезагрузка роутера (`/system reboot`) при исчерпании лимита бэкофф-циклов.
 
 ---
 
@@ -36,7 +56,7 @@
 | Параметр | Значение по умолчанию | Описание |
 | :--- | :--- | :--- |
 | `pingHost1` | `"77.88.8.8"` | Основной контрольный IP-адрес (Яндекс DNS) |
-| `pingHost2` | `"1.1.1.1"` | Резервный контрольный IP-адрес (Cloudflare DNS) |
+| `pingHost2` | `"195.208.4.1"` | Резервный контрольный IP-адрес (НСДИ РФ) |
 | `failThreshold` | `4` | Количество подряд неудачных проверок для фиксации аварии (4 * 30с = 2 мин) |
 | `usbResetDuration` | `"10s"` | Длительность отключения питания USB-порта при сбросе |
 | `maxQuickAttempts` | `2` | Количество подряд идущих быстрых попыток USB power-reset |
@@ -50,7 +70,7 @@
 
 ---
 
-## Установка и настройка
+## Установка и настройка на MikroTik
 
 ### Шаг 1. Создание скрипта секретов `usb-watchdog-secrets` (один раз)
 
@@ -61,20 +81,21 @@
 
 ---
 
-### Шаг 2. Создание основного скрипта `usb-watchdog-check`
+### Шаг 2. Создание или обновление основного скрипта `usb-watchdog-check`
 
 **Вариант А (прямая загрузка из локального Gitea «Чай»):**
 ```routeros
 /tool fetch url="http://10.10.30.105:3000/home-lab/mikrotik-usb-watchdog/raw/branch/main/usb-watchdog-check.rsc" dst-path="usb-watchdog-check.rsc"
-/system script add name=usb-watchdog-check policy=read,write,test,reboot source=[/file get "usb-watchdog-check.rsc" contents]
+/system script set usb-watchdog-check policy=read,write,test,reboot source=[/file get "usb-watchdog-check.rsc" contents]
 /file remove "usb-watchdog-check.rsc"
 ```
 
 **Вариант Б (через WinBox):**
-1. Откройте **System → Scripts → Add (+)**.
-2. Имя: `usb-watchdog-check`.
-3. Policies: `read`, `write`, `test`, `reboot`.
-4. Вставьте код из `usb-watchdog-check.rsc`.
+1. Откройте **System → Scripts**.
+2. Создайте или откройте `usb-watchdog-check`.
+3. Установите Policies: `read`, `write`, `test`, `reboot`.
+4. Вставьте содержимое [`usb-watchdog-check.rsc`](usb-watchdog-check.rsc).
+5. Нажмите **Apply** → **OK**.
 
 ---
 
@@ -97,7 +118,7 @@
    /file print where name~"usb-watchdog-state"
    /file get [find where name~"usb-watchdog-state"] contents
    ```
-3. **Ручной тест сброса USB-порта:**
+3. **Ручной тест сброса питания USB-порта:**
    ```routeros
    /system routerboard usb power-reset duration=5s
    ```
