@@ -1,22 +1,8 @@
 # ============================================================
-# USB LTE/3G modem watchdog — тело скрипта "usb-watchdog-check"
-# Версия: v2.0 Hardened (RAM-First + Flash-Safe + Dual-Ping)
-# Роутер: MikroTik RB2011 (Wireless), RouterOS 7.24+
-# Репозиторий: http://10.10.30.105:3000/home-lab/mikrotik-usb-watchdog
-#
-# Логика:
-#  1) раз в 30 сек (через scheduler) пингуем 2 контрольных узла (Dual-Ping);
-#  2) после failThreshold подряд неудачных проверок делаем USB power-reset;
-#  3) быстрых попыток сброса — maxQuickAttempts (по умолчанию 2),
-#     между ними пауза quickRetryTicks*30 сек (по умолчанию 2 мин);
-#  4) если быстрые попытки не помогли — ступенчатый бэкофф: 2 часа -> 6 часов;
-#  5) если maxRebootCycles бэкофф-циклов подряд не помогли —
-#     крайняя мера: полная системная перезагрузка роутера;
-#  6) Flash-Safe RAM-First архитектура: счетчики и тики крутятся в RAM,
-#     запись на диск (/file set) выполняется ТОЛЬКО при смене макро-состояния
-#     (0 обращений к Flash-памяти в штатном режиме);
-#  7) секреты (URL вебхука) изолированы в скрипте "usb-watchdog-secrets";
-#  8) при восстановлении связи отправляется уведомление в Synology Chat.
+# USB LTE/3G modem watchdog (v2.1 Hardened & Decoupled)
+# Hardware: MikroTik RB2011 / RouterOS v7.24+
+# Architecture: RAM-first, 0 Flash Wear, Dual Ping, Decoupled Secrets
+# Repository: http://10.10.30.105:3000/home-lab/mikrotik-usb-watchdog
 # ============================================================
 
 :global wdFailCount
@@ -28,7 +14,7 @@
 :global wdLastSavedState
 :global synoChatWebhook
 
-# ---------------- настройки ----------------
+# ---------------- Настройки ----------------
 :local pingHost1 "77.88.8.8"
 :local pingHost2 "1.1.1.1"
 :local failThreshold 4
@@ -41,14 +27,9 @@
 :local maxRebootCycles 2
 :local tickSeconds 30
 :local stateFileName "usb-watchdog-state.txt"
-
-# Подтягиваем Webhook из скрипта секретов (если не задан в ОЗУ)
-:if ([:typeof $synoChatWebhook] = "nothing" or $synoChatWebhook = "") do={
-    :do { /system script run usb-watchdog-secrets } on-error={}
-}
-:local webhookUrl $synoChatWebhook
 # -------------------------------------------
 
+# Инициализация переменных в RAM по умолчанию
 :if ([:typeof $wdFailCount] = "nothing") do={ :set wdFailCount 0 }
 :if ([:typeof $wdQuickAttempts] = "nothing") do={ :set wdQuickAttempts 0 }
 :if ([:typeof $wdBackoffTicks] = "nothing") do={ :set wdBackoffTicks $backoffInitialTicks }
@@ -56,7 +37,7 @@
 :if ([:typeof $wdRebootCycles] = "nothing") do={ :set wdRebootCycles 0 }
 :if ([:typeof $wdLastSavedState] = "nothing") do={ :set wdLastSavedState "" }
 
-# ---- чтение с диска ТОЛЬКО при первой загрузке (холодный старт) ----
+# Чтение с диска ТОЛЬКО при первой загрузке (холодный старт / перезагрузка роутера)
 :if ([:typeof $wdStateLoaded] = "nothing" or $wdStateLoaded != true) do={
     :do {
         :local fileId [/file find where name=$stateFileName]
@@ -84,7 +65,7 @@
     :set wdStateLoaded true
 }
 
-# ---- функция дифференциальной записи на Flash ----
+# Функция записи на Flash: вызывается ИСКЛЮЧИТЕЛЬНО при смене макро-состояния
 :local saveMacroState do={
     :global wdLastSavedState
     :local content ($1)
@@ -108,7 +89,7 @@
     }
 }
 
-# ---- 1. Отказоустойчивый опрос контрольных узлов (Dual Ping) ----
+# 1. Отказоустойчивый опрос контрольных узлов (Dual Ping)
 :local isUp false
 :do {
     :if ([/ping $pingHost1 count=2] > 0) do={
@@ -120,20 +101,30 @@
     }
 } on-error={ :set isUp false }
 
-# ---- 2. Обработка статуса связи ----
+# 2. Обработка статуса связи
 :if ($isUp = true) do={
     :if ($wdFailCount >= $failThreshold) do={
         :log info "usb-watchdog: связь успешно восстановлена"
         :if ($wdQuickAttempts > 0 or $wdRebootCycles > 0) do={
+            # Подтягиваем актуальный секрет непосредственно перед отправкой
+            :do {
+                /system script run usb-watchdog-secrets
+            } on-error={
+                :log warning "usb-watchdog: не удалось выполнить usb-watchdog-secrets"
+            }
+            :local webhookUrl $synoChatWebhook
             :if ([:typeof $webhookUrl] = "str" and $webhookUrl != "" and !($webhookUrl ~ "YOUR-NAS-ADDRESS")) do={
                 :do {
                     /tool fetch url=$webhookUrl http-method=post \
                         http-header-field="Content-Type: application/x-www-form-urlencoded" \
                         http-data="payload={\"text\":\"USB watchdog: интернет восстановлен после сброса модема\"}" \
                         output=none
+                    :log info "usb-watchdog: уведомление в Synology Chat отправлено"
                 } on-error={
-                    :log warning "usb-watchdog: не удалось отправить вебхук о восстановлении"
+                    :log warning "usb-watchdog: не удалось отправить вебхук"
                 }
+            } else={
+                :log warning "usb-watchdog: webhookUrl не задан или содержит шаблонное значение"
             }
         }
     }
@@ -142,13 +133,14 @@
     :set wdBackoffTicks $backoffInitialTicks
     :set wdWaitTicks 0
     :set wdRebootCycles 0
-    [$saveMacroState "0;240;0;0" $stateFileName]
+    # Синхронизируем штатное состояние на Flash только если до этого была авария
+    [$saveMacroState ("0;" . $backoffInitialTicks . ";0;0") $stateFileName]
 } else={
     :set wdFailCount ($wdFailCount + 1)
     :log info ("usb-watchdog: пинг не прошел, failCount=" . $wdFailCount)
 
     :if ($wdFailCount >= $failThreshold) do={
-        # В режиме ожидания счетчик тиков крутится ТОЛЬКО в RAM
+        # В режиме ожидания счетчик крутится ТОЛЬКО в RAM, не трогая Flash!
         :if ($wdWaitTicks > 0) do={
             :set wdWaitTicks ($wdWaitTicks - 1)
             :log info ("usb-watchdog: пауза (бэкофф/инициализация), осталось тиков=" . $wdWaitTicks)

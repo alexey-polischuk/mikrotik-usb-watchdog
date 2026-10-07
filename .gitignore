@@ -4,3 +4,9 @@
 .multica/
 AGENTS.md
 reply.md
+
+# Sensitive files & temporary states
+usb-watchdog-secrets.rsc
+usb-watchdog-state.txt
+*.backup
+*.rif
