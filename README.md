@@ -34,14 +34,14 @@ mikrotik-usb-watchdog/
    - Мониторинг по двум независимым узлам:
      - `pingHost1` = `77.88.8.8` (Яндекс DNS)
      - `pingHost2` = `195.208.4.1` (НСДИ РФ / НИИ «Восход», RTT ~25–40 ms)
-   - Полная независимость от блокировок зарубежных DNS (`8.8.8.8`, `1.1.1.1`) на российских операторах.
+   - Полная независимость от блокировок зарубежных DNS (`8.8.8.8`, `1.1.1.1`) на российских сотовых операторах.
 3. **Быстрые попытки сброса (USB Power-Reset):**
    - До `maxQuickAttempts` (по умолчанию 2) попыток с паузой `quickRetryTicks` (2 мин).
 4. **Прогрессивный бэкофф (Exponential Backoff):**
    - 1-й цикл: пауза **2 часа** (240 тиков).
    - 2-й цикл: пауза **6 часов** (720 тиков).
 5. **Изоляция секретов (Decoupled Secrets):**
-   - Секретный URL вебхука хранится в отдельном скрипте `usb-watchdog-secrets`. Основной код `usb-watchdog-check.rsc` на 100% обезличен и безопасен для публикации в Git.
+   - Секретный URL вебхука хранится в отдельном изолированном скрипте `usb-watchdog-secrets` с минимальными правами `read,test`. Основной код `usb-watchdog-check.rsc` на 100% обезличен и безопасен для публикации в Git.
 6. **Уведомления в Synology Chat:**
    - Оповещение отправляется только при фактическом восстановлении связи после аварии.
 7. **Крайняя мера (Reboot Fallback):**
@@ -83,19 +83,19 @@ mikrotik-usb-watchdog/
 
 ### Шаг 2. Создание или обновление основного скрипта `usb-watchdog-check`
 
-**Вариант А (прямая загрузка с репозитория):**
-```routeros
-/tool fetch url="https://raw.githubusercontent.com/alexey-polischuk/mikrotik-usb-watchdog/main/usb-watchdog-check.rsc" dst-path="usb-watchdog-check.rsc"
-/system script set usb-watchdog-check policy=read,write,test,reboot source=[/file get "usb-watchdog-check.rsc" contents]
-/file remove "usb-watchdog-check.rsc"
-```
-
-**Вариант Б (через WinBox):**
+#### Вариант А. Через WinBox (Рекомендуется)
 1. Откройте **System → Scripts**.
-2. Создайте или откройте `usb-watchdog-check`.
-3. Установите Policies: `read`, `write`, `test`, `reboot`.
-4. Вставьте содержимое [`usb-watchdog-check.rsc`](usb-watchdog-check.rsc).
+2. Создайте новый или откройте существующий скрипт **`usb-watchdog-check`**.
+3. Установите флаги Policies: `read`, `write`, `test`, `reboot`.
+4. Вставьте код из файла [`usb-watchdog-check.rsc`](usb-watchdog-check.rsc).
 5. Нажмите **Apply** → **OK**.
+
+#### Вариант Б. Через терминал MikroTik (CLI)
+```routeros
+/system script add name=usb-watchdog-check policy=read,write,test,reboot
+/system script edit usb-watchdog-check source
+```
+*(Вставьте код скрипта, сохраните комбинацией `Ctrl+O` и выйдите `Ctrl+X`).*
 
 ---
 
